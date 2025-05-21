@@ -239,138 +239,6 @@ def get_all_results_by_statement(api_fun, statement, limit=500, as_dict=False):
         results = [{key: getattr(r, key) for key in dir(r) if not key.startswith('_')} for r in results]
     return results
 
-def composing_key_values_dictionary(orders, name_prefix, orders_dict, key_values):
-    values_ids = {value['name']: value['id'] for value in key_values}
-    line_items_dict = dict()
-    for key, values in orders.items():
-        line_items_json = []
-        for value in values:
-            line_items_json.append({
-                'order_id': orders_dict[key],
-                'key_value_name': "{:.2f}".format(value / 100),
-                'key_value_id': values_ids["{:.2f}".format(value / 100)],
-                'li_name': name_prefix + "{:06.2f}".format(value / 100)
-            })
-        line_items_dict[key] = line_items_json
-    return line_items_dict
-
-def get_buckets_line_item_json(dfp_client: DfpClient, line_items_dict, sizes, key_id, currency='EUR', multi_targeting=None):
-    ad_unit_id = get_root_unit_id(dfp_client)
-    li_json = []
-    for key, values in line_items_dict.items():
-        for value in values:
-            if multi_targeting is not None:
-                custom_targeting = multi_targeting[value['key_value_name']]
-            else:
-                custom_targeting = {"xsi_type": "CustomCriteriaSet",
-                                    "logicalOperator": "OR",
-                                    "children": [
-                                        {"xsi_type": "CustomCriteriaSet",
-                                         "logicalOperator": "AND",
-                                         "children": [
-                                             {"xsi_type": "CustomCriteria",
-                                              "keyId": key_id,
-                                              "valueIds": [value['key_value_id']],
-                                              "operator": "IS"}]
-                                         }]
-                                    }
-            cost_per_unit = float(value['key_value_name'])
-            li_json.append(get_line_item_json(value['li_name'], False, value['order_id'], sizes, ad_unit_id,
-                                              cost_per_unit, custom_targeting, None, currency, None)) # type: ignore
-    return li_json
-
-
-def get_root_unit_id(dfp_client: DfpClient):
-    network_service = dfp_client.GetService(
-        "NetworkService", version=VERSION_NB
-    )
-    network = network_service.getCurrentNetwork()
-    return network['effectiveRootAdUnitId']
-
-
-def get_line_item_json(name, is_adx, order_id, size, ad_unit_id, cost_per_unit_eur=0, custom_targeting=None,
-                       price_priority=None, currency="EUR", web_property_code=None):
-    """
-    Args:
-        dfp_client:
-        name: line item name
-        is_adx: either Adx Exchange or Price Priority
-        order_id:
-        size:
-            - {"width": 123, "height": 456}
-            - [{"width": 123, "height": 456}, {"width": 234, "height": 567}]
-            - [(123,456),(234,567)]
-        ad_unit_id:
-        years_lifetime:
-        cost_per_unit_eur:
-        custom_targeting: None or Buckets Key and Values
-        price_priority: used in case of Sponsorship Line Items
-        currency: Euros, Dollars, Pounds
-        web_property_code: In yieldlove is none by default
-    Returns:
-    """
-    if type(size) == dict:
-        size = [size]
-    if currency not in ["USD", "EUR", "GBP"]:
-        raise Exception("Unknown currency {}.".format(currency))
-    creative_placeholders = []
-    for s in size:
-        if type(s) == dict:
-            s = (s["width"], s["height"])
-        creative_placeholders.append({
-            "size": {
-                "width": s[0],
-                "height": s[1],
-                "isAspectRatio": False
-            },
-            "expectedCreativeCount": 1,
-            "creativeSizeType": "PIXEL"
-        })
-    if is_adx:
-        creative_rotation_type = "EVEN"
-        line_item_type = "AD_EXCHANGE"
-    else:
-        creative_rotation_type = "MANUAL"
-        line_item_type = "PRICE_PRIORITY"
-        web_property_code = None
-    line_item = {
-        "orderId": order_id,
-        "name": name,
-        "startDateTimeType": "IMMEDIATELY",
-        "unlimitedEndDateTime": True,
-        "creativeRotationType": creative_rotation_type,
-        "deliveryRateType": "FRONTLOADED",
-        "roadblockingType": "ONE_OR_MORE",
-        "lineItemType": line_item_type,
-        "costPerUnit": {
-            "currencyCode": currency,
-            "microAmount": int(cost_per_unit_eur * 1000000)
-        },
-        "costType": "CPM",
-        "creativePlaceholders": creative_placeholders,
-        "webPropertyCode": web_property_code,
-        "targeting": {
-            "inventoryTargeting": {
-                "targetedAdUnits": [{
-                    "adUnitId": ad_unit_id,
-                    "includeDescendants": True
-                }]
-            },
-            "technologyTargeting": ""
-        },
-        "primaryGoal": {
-            "goalType": "NONE",
-            "unitType": "IMPRESSIONS",
-            "units": -1
-        }
-    }
-
-    if price_priority is not None and type(price_priority) == int:
-        line_item["priority"] = price_priority
-    if custom_targeting is not None:
-        line_item["targeting"]["customTargeting"] = custom_targeting
-    return line_item
-
 def create_line_item_bulk(dfp_client: DfpClient, line_items):
     start_index = 0
     limit = 200
@@ -515,17 +383,6 @@ def create_buckets_additional_keys(dfp_client: DfpClient, additional_keys):
                  for item in additional_keys}
     return keys_dict
 
-# def create_sucbid_values(dfp_client: DfpClient, key_prefix='yieldlove_hb_sucbid'):
-#     key_id = get_bucket_key(dfp_client, key_prefix)
-#     key_values = ["true", "false"]
-#     results = None
-#     try:
-#         results = create_targeting_key_values(dfp_client, key_id, key_values)
-#     except Exception as e:
-#         if "CustomTargetingError.VALUE_NAME_DUPLICATE" in str(e.args):
-#             results = get_all_key_values(dfp_client, key_name='yieldlove_hb_sucbid', only_active=True, as_dict=False)
-#     return results
-
 def create_targeting_key_values(dfp_client: DfpClient, key_id: int, key_name:str, key_values):
     """
     Create the key values for a targeting key with the given id.
@@ -551,15 +408,6 @@ def create_targeting_key_values(dfp_client: DfpClient, key_id: int, key_name:str
         )
     cts.createCustomTargetingValues(values)
     return get_all_key_values(dfp_client, key_name, only_active=False, as_dict=False)
-
-
-def get_companies(dfp_client: DfpClient, company_ids: list):
-    service = dfp_client.GetService('CompanyService', version=VERSION_NB)
-    query = 'WHERE id = {}'.format(', '.join([str(id_) for id_ in company_ids]))
-    statement = dfp.FilterStatement(query)
-    print("QUERY", query)
-
-    return get_all_results_by_statement(service.getCompaniesByStatement, statement)
 
 
 def get_root_adunit_id(dfp_client: DfpClient):

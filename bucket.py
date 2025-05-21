@@ -5,6 +5,7 @@ from textwrap import dedent
 import pytz
 import dfp_api
 from validation_helper import Formats, LineItemTypes
+
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 class Buckets():
@@ -313,7 +314,7 @@ class Buckets():
             }
         elif self.end_time == 'unlimited':
             # if unlimited is not allowed, just add 10 years from now 
-            logging.warning(f'selected line-item-type ({self.line_item_type}) does not allow "unlimited" as end-time; mapping to one year from now')
+            logging.warning(f'selected line-item-type ({self.line_item_type}) does not allow "unlimited" as end-time; mapping to ten years from now')
             return {
                 'endDateTime': (datetime.datetime.now(pytz.utc) + datetime.timedelta(days=(365*10))).replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S'),
                 'unlimitedEndDateTime': False
@@ -424,6 +425,7 @@ class Buckets():
 
         if not self.target_ad_units:
             # set root-adunit as target adunit if no target adunit is given
+            # TODO: find out if this is actually run of network (after fixing it oops) & if it's necesary in the first place
             self.target_ad_units = [dfp_api.get_root_adunit_id(self.dfp_client)]
         else:
             # validate target adunits; exits if invalid adunit is passed
@@ -457,37 +459,3 @@ class Buckets():
         dfp_api.create_licas_buckets_creative_set(self.dfp_client, creative_dict['creativeSetId'], creative_dict['masterCreativeId'], li_ids) 
         
         logging.info('WE RAN THROUGH THE WHOLE CODE WITHOUT ERRORS!!!')
-      #  dfp_api.create_licas_buckets(self.dfp_client, master_creative_id, li_ids, self.sizes) # type: ignore
-
-        
-        
-# ----------- original yieldbot call, non-functional -----------
-
-    def create_buckets(self, dfp_id: int, trafficker_id: int, advertiser_id: int, currency='EUR'):
-        """
-        Do the rollout buckets for the ordinary Header Bidding.
-
-        Args:
-            dfp_id (int): ID of the DFP where the buckets are supposed to be rolled out. 
-                Example: The one from Yieldlove is 53015287.
-            trafficker_id (int): This can be found in the new DFP under Admin -> Access & Authorization -> Users. 
-                Look for Yieldlove or something similar.
-            advertiser_id (int): This can be found under Admin -> Companies. Look for Yieldlove or something similar.
-                If not found, go to Orders, click on "New Order," and write "Yieldlove" in the "Advertiser" field.
-                Then click on "Add a new company." Afterwards, it can be found under Admin -> Companies.
-            currency (str): The currency for the line items. Defaults to 'EUR'. Additional options include 'USD' and 'GBP'.
-        """
-        self.dfp_client = dfp_api.get_dfp_client_for_account(dfp_id)
-        orders_dict = dfp_api.create_orders_buckets(self.dfp_client, list(self.orders.keys()),trafficker_id, advertiser_id) # type: ignore
-        key_id = dfp_api.get_bucket_key(self.dfp_client, self.key_prefix) # type: ignore
-        values = [order for orders in self.orders.values() for order in orders] # type: ignore
-        key_values = dfp_api.create_hb_key_values(self.dfp_client, values, key_id, self.key_prefix, return_all=False) # type: ignore
-        line_items_dict = dfp_api.composing_key_values_dictionary(self.orders, self.name_prefix, orders_dict, key_values) # type: ignore
-        li_json = dfp_api.get_buckets_line_item_json(self.dfp_client, line_items_dict, self.sizes, key_id, # type: ignore
-                                                     currency=currency)
-        line_items = dfp_api.create_line_item_bulk(self.dfp_client, li_json)
-        li_ids = [li['id'] for li in line_items]
-        master_creative_id = dfp_api.create_master_creative_and_get_id(self.dfp_client, self.creative_name, self.snippet, advertiser_id, size=(1, 1)) # type: ignore
-        dfp_api.create_licas_buckets(self.dfp_client, master_creative_id, li_ids, self.sizes) # type: ignore
-        dfp_api.create_buckets_additional_keys(self.dfp_client, self.additional_keys)
-        dfp_api.create_sucbid_values(self.dfp_client) # type: ignore

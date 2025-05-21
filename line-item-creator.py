@@ -1,9 +1,7 @@
+from attr import validate
 from validation_helper import *
-from argparse_prompt import PromptParser
+from argparse import ArgumentParser
 from bucket import Buckets
-
-# GAM Network Code / DFP ID
-network_code = 60343726 # this is mdnx adserver
 
 def main():
 
@@ -18,26 +16,21 @@ def main():
     print("adunits after validation: ", args['target_ad_units'])
 
     # call Adserver API to create line items
-    # here goes the call of bucket.py
-    bucket = Buckets(args) # I'd love to get some type validation on to args
+    bucket = Buckets(args) 
     if args['write']:
-        # print("don't")
         bucket.actual_run()
-        # bucket.create_buckets()
     else:
         bucket.dry_run()
 
 
-
 def parse_cli_args():
 
-    parser = PromptParser(
+    parser = ArgumentParser(
         prog='Prebid Line Item Creator',
-        description='What the program does',
-        epilog='Text at the bottom of help'
+        description='This tool allows publishers to create master-companion line-items with different price-buckets inside a Google AdManager automatically, to allow websites to display ads via prebid consisting of multiple adslots - Complex Formats.',
+        epilog='Link to the documentation as soon as it is available.'
     )
-    # find out how to validate this (maybe by googleads api?)
-    parser.add_argument('--dfp-id', required=True, type=int, 
+    parser.add_argument('--dfp-id', required=True, type=validate_dfp_id, 
                         help='GAM Network Code / DFP ID')
 
     parser.add_argument('--format', type=validate_format_name, required=True, 
@@ -65,10 +58,10 @@ def parse_cli_args():
     parser.add_argument('--price-bucket-step', required=True, type=int,
                         help='Price bucket step in cents (e.g. 25 for 0.25€)')
 
-    parser.add_argument('--advertiser-id', required=True, type=int, 
+    parser.add_argument('--advertiser-id', required=True, type=validate_advertiser_id, 
                         help='Advertiser ID')
 
-    parser.add_argument('--trafficker-id', required=True, type=int, 
+    parser.add_argument('--trafficker-id', required=True, type=validate_trafficker_id, 
                         help='Trafficker ID') 
     
     parser.add_argument('--price-bucket-key-value-name', type=str, default="stroeer_ssp_hb_pb",
@@ -89,9 +82,6 @@ def parse_cli_args():
     parser.add_argument('--end-time', type=validate_end_date, default='unlimited', 
                         help='End time (YYYY-MM-DD HH:MM:SS)')
 
-    # parser.add_argument('--labels', type=validate_labels, default='',
-    #                     help='comma-separated list of labels (e.g. "label1, label2)"') 
-
     parser.add_argument('--write', type=bool, default=False,
                         help='write to google admanager | only use when you are sure everything is configured correctly') # if true performs creation inside gam
 
@@ -100,12 +90,5 @@ def parse_cli_args():
     return args
 
 
-
 if __name__ == "__main__":
     main()
-
-
-
-# python3 line-item-creator.py --format wallpaper --dfp-id 60343726 --line-item-type standard --line-item-priority 8 --master-size 728x90 --companion-size 120x600 --start-price-bucket 500 --end-price-bucket 1000 --price-bucket-step 25 --advertiser-id 5794037913 --trafficker-id 256137386
-
-# demo price bucket is: prebid_test_hb_pb with 15818251 as key_id

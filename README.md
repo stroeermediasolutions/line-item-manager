@@ -1,11 +1,13 @@
+Will update README when script is finished in its first iteration - current state of the documentation can be found [here](https://github.com/mbrtargeting/stroeerMetaTag-development-ts/blob/docs/cli-line-item-creator/packages/metatag-docs/docs/Integration/complex-formats-on-reach-publishers/stroeerCore_line-item_manager.md)
+
 1. `source venv/bin/activate`
-2. `pip install -r requirements.txt`
+2. `pip install -r requirements.txt` (some dependencies are outdated due to googleads (see: https://github.com/googleads/googleads-python-lib/tree/main) being restrictive on the versions that are being used)
 3. Create a API Key for google admanager api here: https://console.cloud.google.com/apis/dashboard (see doc: https://developers.google.com/ad-manager/api/authentication)
 4. Create a folder `secret` at the top level of the directory and paste your api-key-file from step 3 into the folder 
 5. create a googleads.yaml on the top level of the directory and paste the following syntax in it:
     ```yaml
     ad_manager:
-        application_name: prebid-line-item-creator
+        application_name: stroeerCore-line-item-manager
         network_code: YOUR_GOOGLE_ADMANAGER_NETWORK_CODE
         path_to_private_key_file: PATH_TO_YOUR_SECRET_FILE
     ```
